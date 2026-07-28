@@ -1,0 +1,21 @@
+#108 radiomikai parametert ad
+
+imageType:
+  Original: {}
+
+setting:
+  label: 1
+  binWidth: 50
+  normalize: false
+  removeOutliers: 3
+  preCrop: true
+  padDistance: 5
+
+featureClass:
+  firstorder: []
+  shape: []
+  glcm: []
+  glrlm: []
+  glszm: []
+  gldm: []
+  ngtdm: []
