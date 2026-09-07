@@ -8,7 +8,7 @@ import ants
 from radiomics import featureextractor
 
 
-#ebben a szakaszban a tobbhelyrol erkezo szamszeru adatokat lebegopontos szabba alakitja, ahol nincs adat, ott none-t ad vissza
+#At this stage, it converts numerical data received from multiple sources into floating-point format; where there is no data, it returns “none.”
 def to_float(x):
     if x is None:
         return None
@@ -21,14 +21,14 @@ def to_float(x):
     except Exception:
         return None
 
-#egysegesiti a tobbhelyrol erkezo sesid-ket (levagja a ses elotagot/valtozatlanul hagyja ha nincs)
+#consolidates SESIDs coming from multiple sources (removes the “SES” prefix or leaves it unchanged if it is not present)
 def norm_session_id(s: str) -> str:
     s = str(s).strip()
     if s.startswith("ses-"):
         s = s[4:]
     return s
 
-#dontest hoz, hogy ket sesid ugyanaz-e (tsvben pontok a szeparalok, fileneveben I)
+#It's a test to see if the two sesid are the same
 def session_ids_equivalent(a: str, b: str) -> bool:
     a = norm_session_id(a)
     b = norm_session_id(b)
@@ -36,7 +36,7 @@ def session_ids_equivalent(a: str, b: str) -> bool:
     if a == b:
         return True
 
-#a lenti modszereken megy vegig, hogy egyenloek a sesid-k
+#It goes through the methods listed below to ensure that the sesids are equal
     if a.replace("I", ".") == b:
         return True
     if a == b.replace("I", "."):
@@ -48,7 +48,7 @@ def session_ids_equivalent(a: str, b: str) -> bool:
 
     return False
 
-#megkeresi a DataFrameban az elso olyan oszlopot, amit kerni akarok (fuggetlenul attol, hogy kis/nagy betu/eliras van-e benne)
+#finds the first column in the DataFrame that I want to filter by (regardless of whether it contains lowercase, uppercase, or misspelled words)
 def pick_col_case_insensitive(df: pd.DataFrame, wanted: list[str]):
     cols = list(df.columns)
     lower_map = {c.lower(): c for c in cols}
@@ -57,18 +57,18 @@ def pick_col_case_insensitive(df: pd.DataFrame, wanted: list[str]):
             return lower_map[w.lower()]
     return None
 
-#a session.tsvbol kiolvassa egy adott beteghez tartozo sesid alapjan a testsulyt es magassagot, majd BMI-t szamol.
+#It reads the weight and height from the session.tsv file based on the session ID associated with a specific patient, and then calculates the BMI.
 def read_sessions_meta(rawdata_root: str, taj: str, sesid: str) -> dict:
     sesid = norm_session_id(sesid)
-#alapertelmezett kimenet az out, akkoris ha nincs adat
+#The default output is “out,” even if there is no data
     out = {"Patient_Weight_kg": None, "Patient_Size_m": None, "BMI": None}
 
-#session.tsv megkeresese, ha nincs, NONE ertekkel ter vissza
+#Check for session.tsv; if it does not exist, return “NONE”
     sessions_tsv = os.path.join(rawdata_root, f"sub-{taj}", "sessions.tsv")
     if not os.path.isfile(sessions_tsv):
         return out
 
-    #a tsv beolvasasa rugalmas szeparatorokkal (; tab, vesszo+szokoz)
+    #Reading a TSV file using flexible delimiters (; tab, comma+space)
     df = pd.read_csv(
         sessions_tsv,
         sep=r"\t|;|\s*,\s*",
@@ -77,36 +77,36 @@ def read_sessions_meta(rawdata_root: str, taj: str, sesid: str) -> dict:
         skipinitialspace=True,
     )
     df.columns = [c.strip() for c in df.columns] #veletlen/felesleges szokozok leszedese
-#sesid oszlop megkeresese a lenti elofordulhatosagok alapjan
+#Search for the “sesid” column based on the possibilities listed below
     sid_col = pick_col_case_insensitive(df, ["session-id", "session_id", "session", "sesid", "ses"])
     if sid_col is None:
         return out
-#size es weight oszlopok megkeresese
+#Finding the “size” and “weight” columns
     w_col = pick_col_case_insensitive(df, ["weight", "patient_weight", "Patient_Weight", "testsuly"])
     s_col = pick_col_case_insensitive(df, ["size", "patient_size", "Patient_Size", "magassag"])
 
-    #sesidhez tartozo sor megkeresese (ha tobb is van, az utolso sort hagyja meg)
+    #Find the row associated with “sesid” (if there are multiple, keep the last row)
     hit = None
     for _, row in df.iterrows():
         sid_val = (row.get(sid_col, "") or "").strip()
         if session_ids_equivalent(sid_val, sesid):
             hit = row
 
-    #weight: csak az aktualis sesidbol
+    #weight: only from the current session
     w = None
     if hit is not None and w_col:
         w = to_float(hit.get(w_col))
 
-    #size: elsosorban az aktualis sesid-hez tartozo sorbol
+    #size: primarily from the row associated with the current session
     s = None
     if hit is not None and s_col:
         s = to_float(hit.get(s_col))
 
-    #ha veletlenul cm-ben fordulna elo, akkor m-re konvertalja
+    #If it's in centimeters, convert it to meters
     if isinstance(s, float) and s > 3.0:
         s = s / 100.0
 
-    #ha nincs az aktualis sesidben size, akkor megnezi, hogy masikban van-e, es az utolso elofordulot valasztja
+    #If “size” isn't in the current session, it checks to see if it's in another one and selects the most recent occurrence.
     if (s is None or not isinstance(s, float) or s <= 0) and s_col:
         fallback_s = None
         for _, row in df.iterrows():
@@ -121,35 +121,35 @@ def read_sessions_meta(rawdata_root: str, taj: str, sesid: str) -> dict:
     out["Patient_Weight_kg"] = w
     out["Patient_Size_m"] = s
 
-#BMI szamolasa
+#BMI counting
     if isinstance(w, float) and isinstance(s, float) and s > 0:
         out["BMI"] = w / (s ** 2)
 
     return out
 
-#adott sub-taj/ses-sesid alatti mappaban keres .json filet es kiolvassa a Station/Institution/Manufacturer model neveket.
+#It searches for .json files in the folder under the specified sub-taj/ses-sesid and reads the Station/Institution/Manufacturer model names.
 def read_ses_json_meta(rawdata_root: str, taj: str, sesid: str) -> dict:
     sesid = norm_session_id(sesid)
-#alapertelmezett kimenet az out
+#The default output is “out”
     out = {
         "Station_Name": None,
         "Institution_Name": None,
         "Manufacturers_Model_Name": None,
     }
 
-#session konyvtar meghatarozasa
+#Definition of “session library”
     ses_dir = os.path.join(rawdata_root, f"sub-{taj}", f"ses-{sesid}")
     if not os.path.isdir(ses_dir):
         return out
 
-#rekurziv .json kereses, mert a konyvtarak felepitese nem mindig egyforma, igy a sesid alatt minden mappaban keresi
+#Recursive .json search, because the directory structure isn't always the same, so it searches every folder under the root directory
     for jp in sorted(glob.glob(os.path.join(ses_dir, "**", "*.json"), recursive=True)):
         try:
             with open(jp, "r", encoding="utf-8") as f:
                 d = json.load(f)
 
-#mindegyik json-t beolvassa, ha talal benne kulcsot es csak akkor irja be, ha addig None volt a cella erteke. ha mindharom erteke megvan, akkor kilep
-#tobbfele modon keresi a kulcsokat a json-okben
+#It reads each JSON file; if it finds a key in it, it writes the value only if the cell's value was previously None. If all three values are present, it exits.
+#It searches for keys in JSON files in various ways
             if out["Manufacturers_Model_Name"] is None and "ManufacturersModelName" in d:
                 v = str(d["ManufacturersModelName"]).strip()
                 out["Manufacturers_Model_Name"] = v or None
@@ -167,20 +167,20 @@ def read_ses_json_meta(rawdata_root: str, taj: str, sesid: str) -> dict:
                             out["Station_Name"] = v
                             break
 
-#kilepesi pont, ha mindharom cella erteke megvan
+#The output point, if the values of all three cells are known
             if all(out[k] is not None for k in out):
                 break
 
-#ha serult a json, nem fog leallni a radiomika
+#If the JSON is corrupted, radiomics won't shut down
         except Exception:
             continue
 
     return out
 
 
-#radiomika
+#radiomics
 def main():
-#argumentumok a Process.shbol
+#arguments from process.sh
     ap = argparse.ArgumentParser()
     ap.add_argument("--adc_in_atlas", required=True)
     ap.add_argument("--taj", required=True)
@@ -194,39 +194,39 @@ def main():
     ap.add_argument("--out_masks_dir", required=True)
     args = ap.parse_args()
 
-#gender validalasa (csak M es F lehet male, female nem)
+#Gender validation (only “M” and “F” are allowed; ‘male’ and “female” are not)
     if args.gender not in {"M", "F"}:
         raise ValueError("Gender must be exactly 'M' or 'F'.")
-#voi megvalasztasa a nem alapjan
+#Selection of Voi based on gender
     voi_path = args.voi_female if args.gender == "F" else args.voi_male
-#kimeneti mappak letrehozasa a resamplezott voiknak es a csvnek
+#Creating an output folder for the resampled VOIs and the CSV files
     os.makedirs(args.out_masks_dir, exist_ok=True)
     os.makedirs(os.path.dirname(args.out_csv), exist_ok=True)
-#radiomics extractor inicializalasa a params.yaml-bol, hogy milyen featureokat szamoljon
+#Initializing the Radiomics Extractor from params.yaml to specify which features to calculate
     extractor = featureextractor.RadiomicsFeatureExtractor(args.params)
-#patientid kiharapasa a filenevebol, ez lesz az oszlop nev a csvben
+#Extract the patient ID from the filename; this will be the column name in the CSV file
     adc_path = args.adc_in_atlas
     patient_id = os.path.basename(adc_path).replace("_adc_in_atlas.nii.gz", "")
 
-    #adc kep beolvasasa
+    #reading adc file
     img = ants.image_read(adc_path)
 
-    #biztonsagi lepes arra, hogy a voimaszk biztosan az adc-re legyen resamplezva (ha mas spaceban lenennek)
+    #A safety measure to ensure that the Voi mask is resampled to the ADC (if they are in different spaces)
     voi = ants.image_read(voi_path)
     voi_on_img = ants.resample_image_to_target(voi, img, interp_type="nearestNeighbor")
-    #a voi kimentese
+    #saving voi
     mask_path = os.path.join(args.out_masks_dir, f"{patient_id}_voi_on_adc.nii.gz")
     ants.image_write(voi_on_img, mask_path)
 
-    #radiomika futtatasa
+    #run radiomics
     feats = extractor.execute(adc_path, mask_path, label=1)
 
-    #a kimeneti csv osszeallitasa, eloszor a testsuly/magassag, utana a statname stb.
+    #Compiling the output CSV file: first by weight/height, then by statname, etc.
     row = {}
     row.update(read_sessions_meta(args.rawdata, args.taj, args.sesid))
     row.update(read_ses_json_meta(args.rawdata, args.taj, args.sesid))
 
-    #radiomikai featureok hozzadasa, csak az original_ elotaguak
+    #Add radiomic features, only those with the “original_” prefix
     for k, v in feats.items():
         if not k.startswith("original_"):
             continue
@@ -235,19 +235,19 @@ def main():
         except Exception:
             row[k] = np.nan
 
-#oszlop letrehozasa, taj_sesid lesz az oszlop neve
+#Create a column; the column name will be “taj_sesid”
     new_col = pd.Series(row, name=patient_id)
 
-    #betolti a mx-ot vagy general ha meg nincs
+    #Fill in the matrix, or, generally, if there isn't one
     if os.path.isfile(args.out_csv):
         df = pd.read_csv(args.out_csv, index_col=0)
     else:
         df = pd.DataFrame()
 
-    #ha az oszlop mar letezett, akkor felulirja, ha nem letezett, hozzaadja
+    #If the column already exists, it overwrites it; if it does not exist, it adds it.
     df[new_col.name] = new_col
 
-    #metasorok felul, utana jonnek a radiomikai featureok
+    #Meta-rows at the top, followed by the radiometric features
     meta_order = [
         "Patient_Weight_kg",
         "Patient_Size_m",
@@ -260,7 +260,7 @@ def main():
     other = [f for f in df.index if f not in meta_order]
     df = df.loc[meta_order + other]
 
-#mentes es kiiratas
+#Save and Print
     df.to_csv(args.out_csv)
     print(f"OK: {patient_id} -> {args.out_csv}")
 
