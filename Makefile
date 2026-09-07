@@ -1,18 +1,16 @@
 # Makefile for liver segmentation
 
 SHELL       := /bin/bash
-#arra valo, hogy a makefile egy shellben fusson vegig
 .ONESHELL:
-#ha valami hibas, a session elbukik, nem lesz "felig" feldolgozott ses.
 .SHELLFLAGS := -euo pipefail -c
 
-#inputok a process.shbol
+#inputs from process.sh
 Gender  ?=
 T1Nifti ?=
 ADC     ?=
 SESID   ?=
 
-#hibauzenetek, ha valamelyik bemenetek nem jon
+#warning messanges
 ifeq ($(strip $(Gender)),)
 $(error Gender is not set. Use: make target Gender=F)
 endif
@@ -28,14 +26,13 @@ ifeq ($(strip $(SESID)),)
     $(error SESID is not set. Use: make all SESID=01)
 endif
 
-#taj kinyerese a t1 file nevebol
+#patiend-id from the nii file name
 TAJ := $(shell basename "$(T1Nifti)" | sed -E 's/.*sub-([0-9]{9}).*/\1/')
 
 ifeq ($(strip $(TAJ)),)
 $(error Could not extract TAJ from T1Nifti: $(T1Nifti))
 endif
 
-#dinamikus mappak
 BASEWD    = 
 WD        = $(BASEWD)/$(TAJ)
 #ScriptDir = $(BASEWD)/steps
@@ -60,7 +57,7 @@ QC_MASTER_CSV     = $(BASEWD)/qc_metrics.csv
 
 PatientMaskInAtlas ?= $(T1Liver2Atlas)
 
-#scriptek listaja
+#scripts
 liverSegm        = segment_liver.py
 binaryMaskFill   = $(ScriptDir)/t1_mask_filling/binary_mask_filling.py
 t12atlas         = $(ScriptDir)/t12atlas/euler/t12atlas_euler.py
@@ -121,7 +118,7 @@ $(ADCLiver2Atlas): $(ADC) $(TFMADCLiver2T1) $(TFMT1Liver2Atlas) $(liverAtlas)
 	"$(liverAtlas)" \
 	"$(ADCLiver2Atlas)"
 
-#Jaccard index es Hausdorff distance szamolasa
+#Jaccard index and Hausdorff distance counting
 qc: $(T1Liver2Atlas)
 	@mkdir -p "$(BASEWD)"
 	@source totalsegm/totalsegm_env_310/bin/activate
@@ -134,7 +131,7 @@ qc: $(T1Liver2Atlas)
 	echo "$(TAJ),$(SESID),$(Gender),$$J,$$D,$$H" >> "$(QC_MASTER_CSV)"; \
 	echo "QC: J=$$J Dice=$$D H=$$H"
 
-# segedfeladatok: teszt es torles
+#test and delete
 test:
 	@echo "TAJ = $(TAJ)"
 	@echo "Gender = $(Gender)"
