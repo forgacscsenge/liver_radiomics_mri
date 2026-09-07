@@ -7,7 +7,7 @@ import SimpleITK as sitk
 def load_and_binarize(path: str):
     img = sitk.ReadImage(path)
 
-    # Ha 4D lenne, vágjuk 3D-re (ritka, de előfordul)
+    #If it's in 4D, let's cut it down to 3D (rare, but it happens)
     if img.GetDimension() == 4:
         full = list(img.GetSize())
         size3d = [full[0], full[1], full[2], 0]
