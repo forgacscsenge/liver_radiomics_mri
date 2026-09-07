@@ -10,7 +10,7 @@ def liversegment(inputpath,outputfolder):
 
     os.makedirs(outputfolder, exist_ok=True)
 
-    #totalsegmentator futtatasa
+    #running totalsegmentator
     totalsegmentator(
         inputpath,
         outputfolder,
