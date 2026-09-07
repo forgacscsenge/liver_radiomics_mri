@@ -22,8 +22,8 @@ def liversegment(inputpath,outputfolder):
 
 
 if __name__ == "__main__":
-    INPUT_PATH = Path(sys.argv[1])   #bemeneti nii file
-    OUTPUT_FOLDER = Path(sys.argv[2])     #kimeneti mappa
+    INPUT_PATH = Path(sys.argv[1])   #input nii file
+    OUTPUT_FOLDER = Path(sys.argv[2])     #output folder
 
     liversegment(INPUT_PATH, OUTPUT_FOLDER)
 
