@@ -26,17 +26,18 @@ RADIOMICS_SCRIPT="run_radiomics.py"
 VOI_MALE="$HOME/male_liver_average_trh05_voi.nii.gz"
 VOI_FEMALE="$HOME/female_liver_average_trh05_voi.nii.gz"
 
-#params.yaml file, illetve kimeneti mappak es fileok definialasa
+#params.yaml file, and define output folders and files
 PARAMS_YAML="$HOME/params_adc.yaml"
 RAD_OUTDIR="$HOME/out_integrated"
 RAD_OUTCSV="$RAD_OUTDIR/radiomics.csv"
 RAD_MASKDIR="$RAD_OUTDIR/masks"
 mkdir -p "$RAD_OUTDIR"
 
-#makefile kimenetenek definialasa
+#define makefile outputs
 TOTALSEG_OUT_ROOT="output"
 
-#minden betegre, aki a csv-ben van:
+#first two row from .csv
+#all the patients in .csv
 #tail -n +2 "$CSV" | cut -d ';' -f 3 | while read -r i
 
 sed -n '1,136p' "$CSV" | cut -d ';' -f 3 | while read -r i
